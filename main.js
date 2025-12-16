@@ -8,10 +8,9 @@ import { PlayerAircraft } from "./code/PlayerAircraft.js";
 import { GameController } from "./code/GameController.js";
 import { UIManager } from "./code/UIManager.js";
 
-// Your second original file had AudioManager; keeping it won't affect anything
 import { AudioManager } from "./code/AudioManager.js";
 
-// ===== City scene: carried over (equivalent) from the first file =====
+// ===== City scene =====
 import { StarDome } from "./code/NeonStarDome.js";
 import { NeonPlaza } from "./code/NeonPlaza.js";
 import { EnergyCoreTower } from "./code/EnergyCoreTower.js";
@@ -30,11 +29,35 @@ import { CyberRobotWalker } from "./code/CyberRobotWalker.js";
 import { CyberHovercraft } from "./code/CyberHovercraft.js";
 import { NeonDrone } from "./code/NeonDrone.js";
 
+const Mode = Object.freeze({
+  PROTOTYPE: "prototype",
+  FULL: "full",
+});
+
+/**
+ * Decide mode:
+ * 1) prototype.html / full.html sets window.__GAME_MODE__
+ * 2) fallback: URL ?mode=prototype|full
+ */
+function getGameMode() {
+  const fromWindow = (typeof window !== "undefined" && window.__GAME_MODE__) ? String(window.__GAME_MODE__) : "";
+  if (fromWindow === Mode.FULL) return Mode.FULL;
+  if (fromWindow === Mode.PROTOTYPE) return Mode.PROTOTYPE;
+
+  const p = new URLSearchParams(window.location.search);
+  const m = p.get("mode");
+  return (m === Mode.FULL) ? Mode.FULL : Mode.PROTOTYPE;
+}
+
+const GAME_MODE = getGameMode();
+
+// Renderer
 const renderer = new T.WebGLRenderer({ antialias: true });
 const worldContainer = /** @type {HTMLElement} */ (document.getElementById("world-container"));
 renderer.setSize(worldContainer.clientWidth, worldContainer.clientHeight);
 worldContainer.appendChild(renderer.domElement);
 
+// Scene & Camera
 const scene = new T.Scene();
 
 const camera = new T.PerspectiveCamera(
@@ -45,6 +68,7 @@ const camera = new T.PerspectiveCamera(
 );
 camera.position.set(0, 5, 12);
 
+// Lights
 scene.add(new T.AmbientLight(0xffffff, 0.22));
 scene.add(new T.HemisphereLight(0xffffff, 0x080820, 0.85));
 const moon = new T.DirectionalLight(0xffffff, 1.2);
@@ -61,85 +85,63 @@ function addGrObjectToScene(grObj) {
   }
 }
 
-const model1 = new ImportedModel({
-  url: "./models/TransferOnly1.glb",
-  x: 0,
-  y: 85,
-  z: 0,
-  scale: 100
-});
-addGrObjectToScene(model1);
+// Keep a list of "steppable" objects so prototype/full can differ cleanly
+/** @type {any[]} */
+const steppables = [];
 
-const starDome = new StarDome({
-  radius: 500,
-  count: 500,
-  meteorCount: 8,
-  brightness: 1.05,
-  blackLevel: 0.12
-});
-addGrObjectToScene(starDome);
+// ===== Build World: FULL vs PROTOTYPE =====
 
-const rings = new EnergyRings({
-  height: 6,
-  radius: 3.2
-});
+// Common: core gameplay objects
+const rings = new EnergyRings({ height: 6, radius: 3.2 });
 addGrObjectToScene(rings);
-
-const craft = new CyberHovercraft({
-  x: 0,
-  y: 30,
-  z: 0,
-  scale: 2.5,
-  speed: 25
-});
-addGrObjectToScene(craft);
+steppables.push(rings);
 
 const circuits = new NeonCircuits();
 addGrObjectToScene(circuits);
+steppables.push(circuits);
 
 const plaza = new NeonPlaza();
 addGrObjectToScene(plaza);
+steppables.push(plaza);
 
-// 5.7 main hero drone near plaza
 const drone = new NeonDrone();
 addGrObjectToScene(drone);
+steppables.push(drone);
 
-// 5.8 energy core tower at center
 const core = new EnergyCoreTower();
 addGrObjectToScene(core);
+steppables.push(core);
 
-// 5.9 maglev train ring
-const rail = new RailPodTrack({
-  radius: 90,
-  podSpeed: 0.6,
-  y: 0.35
-});
+const rail = new RailPodTrack({ radius: 90, podSpeed: 0.6, y: 0.35 });
 addGrObjectToScene(rail);
+steppables.push(rail);
 
-const trees = new HoloTrees({
-  count: 20,
-  innerRadius: 20,
-  outerRadius: 85,
-  y: 0.2
-});
+const trees = new HoloTrees({ count: 20, innerRadius: 20, outerRadius: 85, y: 0.2 });
 addGrObjectToScene(trees);
+steppables.push(trees);
 
 const towersB1 = new CyberTowerB1({ plazaHeight: 0.2 });
 addGrObjectToScene(towersB1);
+steppables.push(towersB1);
 
 const towersB2 = new CyberTowerB2({ plazaHeight: 0.2 });
 addGrObjectToScene(towersB2);
+steppables.push(towersB2);
 
 const towersB3 = new CyberTowerB3({ plazaHeight: 0.2 });
 addGrObjectToScene(towersB3);
+steppables.push(towersB3);
 
-const billboard = new NeonBillboard({
-  x: -12,
-  z: -6,
-  width: 20,
-  height: 6
+const roads = new RoadNetwork({
+  innerRadius: 35,
+  b2Radius: 55,
+  b3Radius: 75,
+  plazaHeight: 0.2,
+  mainWidth: 2.0
 });
-addGrObjectToScene(billboard);
+addGrObjectToScene(roads);
+steppables.push(roads);
+
 const drones = new CyberDrones({
   count: 12,
   areaRadius: 90,
@@ -150,14 +152,17 @@ const drones = new CyberDrones({
   maxTurn: Math.PI / 3
 });
 addGrObjectToScene(drones);
-const roads = new RoadNetwork({
-  innerRadius: 35,
-  b2Radius: 55,
-  b3Radius: 75,
-  plazaHeight: 0.2,
-  mainWidth: 2.0
+steppables.push(drones);
+
+const craft = new CyberHovercraft({
+  x: 0,
+  y: 30,
+  z: 0,
+  scale: 2.5,
+  speed: 25
 });
-addGrObjectToScene(roads);
+addGrObjectToScene(craft);
+steppables.push(craft);
 
 const bot1 = new CyberRobotWalker({
   x: 10,
@@ -170,6 +175,7 @@ const bot1 = new CyberRobotWalker({
   scale: 3
 });
 addGrObjectToScene(bot1);
+steppables.push(bot1);
 
 const extraBots = [];
 for (let i = 0; i < 6; i++) {
@@ -185,8 +191,10 @@ for (let i = 0; i < 6; i++) {
   });
   extraBots.push(b);
   addGrObjectToScene(b);
+  steppables.push(b);
 }
 
+// Player + UI + Audio + Controller
 const player = new PlayerAircraft();
 addGrObjectToScene(player);
 
@@ -212,16 +220,63 @@ if (typeof controller.registerCityObstacles === "function") {
   controller.registerCityObstacles(towersB3, 8);
 }
 
+// Mode-specific objects
+let starDome = null;
+let model1 = null;
+let billboard = null;
+
+if (GAME_MODE === Mode.FULL) {
+  // FULL: allow models & textures
+  model1 = new ImportedModel({
+    url: "./models/TransferOnly1.glb",
+    x: 0,
+    y: 85,
+    z: 0,
+    scale: 100
+  });
+  addGrObjectToScene(model1);
+  steppables.push(model1);
+
+  starDome = new StarDome({
+    radius: 500,
+    count: 500,
+    meteorCount: 8,
+    brightness: 1.05,
+    blackLevel: 0.12
+  });
+  addGrObjectToScene(starDome);
+  steppables.push(starDome);
+
+  billboard = new NeonBillboard({
+    x: -12,
+    z: -6,
+    width: 20,
+    height: 6
+  });
+  addGrObjectToScene(billboard);
+  steppables.push(billboard);
+} else {
+  // PROTOTYPE: basic geometry only (no model/texture loaders from this entry)
+  // Optional: show a simple "sky shell" using pure color material (no textures)
+  const skyGeom = new T.SphereGeometry(600, 24, 16);
+  const skyMat = new T.MeshBasicMaterial({ color: 0x050510, side: T.BackSide });
+  const sky = new T.Mesh(skyGeom, skyMat);
+  scene.add(sky);
+}
+
 ui.bindDifficultyButtons((level) => {
   controller.setDifficulty(level);
   ui.hideMenu();
-  audio.startMusic();
+  if (GAME_MODE === Mode.FULL) {
+    audio.startMusic();
+  }
 });
 
 ui.bindReplay(() => {
   window.location.reload();
 });
 
+// Animation loop
 let last = performance.now();
 
 function stepIfPossible(obj, deltaMs) {
@@ -246,27 +301,7 @@ function animate() {
   controller.update(delta);
 
   const deltaMs = delta * 1000;
-
-  stepIfPossible(starDome, deltaMs);
-  stepIfPossible(rail, deltaMs);
-  stepIfPossible(drones, deltaMs);
-  stepIfPossible(craft, deltaMs);
-  stepIfPossible(drone, deltaMs);
-  stepIfPossible(bot1, deltaMs);
-  for (const b of extraBots) stepIfPossible(b, deltaMs);
-
-  
-  stepIfPossible(rings, deltaMs);
-  stepIfPossible(circuits, deltaMs);
-  stepIfPossible(trees, deltaMs);
-  stepIfPossible(roads, deltaMs);
-  stepIfPossible(model1, deltaMs);
-  stepIfPossible(core, deltaMs);
-  stepIfPossible(towersB1, deltaMs);
-  stepIfPossible(towersB2, deltaMs);
-  stepIfPossible(towersB3, deltaMs);
-  stepIfPossible(billboard, deltaMs);
-  stepIfPossible(plaza, deltaMs);
+  for (const obj of steppables) stepIfPossible(obj, deltaMs);
 
   renderer.render(scene, camera);
 }

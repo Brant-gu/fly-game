@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Cyber Flight Game — Prototype</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- 关键：告诉 main.js 现在是 prototype -->
+    <script>
+      window.__GAME_MODE__ = "prototype";
+    </script>
+
+    <style>
+      #top-banner {
+        position: absolute;
+        top: 0;
+        width: 100%;
+        text-align: center;
+        padding: 8px 0;
+        font-size: 20px;
+        font-weight: 700;
+        color: #7dfbff;
+        background: rgba(0, 0, 0, 0.45);
+        border-bottom: 1px solid rgba(0, 255, 255, 0.35);
+        text-shadow: 0 0 10px rgba(0,255,255,0.8);
+        z-index: 30;
+        pointer-events: none;
+      }
+
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #000;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #e5f3ff;
+      }
+
+      #game-container { position: relative; width: 100%; height: 100%; }
+
+      #world-container {
+        position: absolute;
+        inset: 0;
+        display: block;
+        overflow: hidden;
+        z-index: 0;
+        background: #111;
+      }
+
+      #hud {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        padding: 10px 14px;
+        background: rgba(5, 5, 16, 0.8);
+        border-radius: 8px;
+        border: 1px solid rgba(0, 255, 255, 0.35);
+        backdrop-filter: blur(6px);
+        box-shadow: 0 0 14px rgba(0, 255, 255, 0.25);
+        font-size: 14px;
+        line-height: 1.4;
+        pointer-events: none;
+        z-index: 10;
+      }
+
+      #hud-title {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 4px;
+        color: #7af3ff;
+        text-shadow: 0 0 8px rgba(0, 255, 255, 0.6);
+      }
+
+      #hud-row { display: flex; gap: 18px; margin-bottom: 4px; }
+      #hud-row-2 { display: flex; gap: 16px; font-size: 11px; opacity: 0.9; }
+
+      .hud-label { font-weight: 500; opacity: 0.9; }
+      .hud-value { font-weight: 600; }
+
+      #help {
+        position: absolute;
+        right: 10px;
+        bottom: 10px;
+        padding: 8px 12px;
+        background: rgba(5, 5, 16, 0.8);
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        font-size: 12px;
+        color: #b0c6ff;
+        pointer-events: none;
+        z-index: 10;
+      }
+
+      #help code {
+        font-family: Menlo, Consolas, monospace;
+        font-size: 11px;
+        background: rgba(0, 0, 0, 0.4);
+        padding: 1px 4px;
+        border-radius: 4px;
+      }
+
+      #menu-overlay,
+      #replay-overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 20;
+        background: radial-gradient(circle at top, rgba(0, 255, 255, 0.18), rgba(0, 0, 0, 0.9));
+      }
+
+      #menu-panel,
+      #replay-panel {
+        min-width: 260px;
+        padding: 20px 24px;
+        border-radius: 12px;
+        background: rgba(5, 8, 20, 0.95);
+        border: 1px solid rgba(0, 255, 255, 0.4);
+        box-shadow: 0 0 30px rgba(0, 255, 255, 0.4);
+        text-align: center;
+      }
+
+      #menu-title {
+        font-size: 22px;
+        font-weight: 700;
+        margin-bottom: 10px;
+        color: #7dfbff;
+        text-shadow: 0 0 12px rgba(0, 255, 255, 0.9);
+      }
+
+      #menu-subtitle { font-size: 13px; margin-bottom: 14px; color: #b3c8ff; }
+
+      .menu-buttons { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+
+      .menu-btn {
+        padding: 8px 12px;
+        border-radius: 8px;
+        border: 1px solid rgba(0, 255, 255, 0.4);
+        background: linear-gradient(135deg, #02253a, #035b6f);
+        color: #e3f9ff;
+        cursor: pointer;
+        font-size: 14px;
+        transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+      }
+
+      .menu-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 0 14px rgba(0, 255, 255, 0.6);
+        background: linear-gradient(135deg, #04758c, #04a6b8);
+      }
+
+      .menu-btn[data-difficulty="easy"] { border-color: #7dff7d; }
+      .menu-btn[data-difficulty="normal"] { border-color: #ffe47d; }
+      .menu-btn[data-difficulty="hard"] { border-color: #ff7d7d; }
+
+      #replay-text { font-size: 16px; margin-bottom: 10px; }
+      #replay-score { font-size: 18px; font-weight: 600; margin-bottom: 14px; color: #7dfbff; }
+
+      #replay-button {
+        padding: 8px 16px;
+        border-radius: 8px;
+        border: 1px solid rgba(0, 255, 255, 0.6);
+        background: linear-gradient(135deg, #023057, #027f8b);
+        color: #e3f9ff;
+        cursor: pointer;
+        font-size: 14px;
+        transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+      }
+
+      #replay-button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 0 14px rgba(0, 255, 255, 0.6);
+        background: linear-gradient(135deg, #02a2b4, #02d0d2);
+      }
+    </style>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./libs/CS559-Three/build/three.module.js",
+          "three/examples/jsm/": "./libs/CS559-Three/examples/jsm/",
+          "three/addons/": "./libs/CS559-Three/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+
+  <body>
+    <div id="top-banner">GROUP 0724 — PROTOTYPE</div>
+
+    <div id="game-container">
+      <div id="world-container"></div>
+
+      <div id="hud">
+        <div id="hud-title">CYBER FLIGHT (Prototype)</div>
+
+        <div id="hud-row">
+          <div>
+            <div class="hud-label">Score</div>
+            <div class="hud-value" id="hud-score">0</div>
+          </div>
+          <div>
+            <div class="hud-label">Time Left</div>
+            <div class="hud-value" id="hud-time">60.0 s</div>
+          </div>
+          <div>
+            <div class="hud-label">Boost Remaining</div>
+            <div class="hud-value" id="hud-boost">5.0 s</div>
+          </div>
+        </div>
+
+        <div id="hud-row-2">
+          <div>
+            <div class="hud-label">Phase</div>
+            <div class="hud-value" id="hud-phase">1</div>
+          </div>
+          <div>
+            <div class="hud-label">Phase Target</div>
+            <div class="hud-value" id="hud-target">25</div>
+          </div>
+          <div>
+            <div class="hud-label">Total Time</div>
+            <div class="hud-value" id="hud-elapsed">0:00</div>
+          </div>
+          <div>
+            <div class="hud-label">Phase Left</div>
+            <div class="hud-value" id="hud-phase-time">60.0 s</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="help">
+        Controls:
+        <code>WASD</code> turn & pitch,
+        <code>Q/E</code> up & down,
+        <code>Shift</code> boost,
+        click to enable mouse-look.
+      </div>
+
+      <div id="menu-overlay">
+        <div id="menu-panel">
+          <div id="menu-title">CYBER FLIGHT</div>
+          <div id="menu-subtitle">Prototype mode (no textures/models). Choose difficulty:</div>
+          <div class="menu-buttons">
+            <button class="menu-btn" data-difficulty="easy">Easy – big rings (2× size)</button>
+            <button class="menu-btn" data-difficulty="normal">Normal – medium rings (1.5× size)</button>
+            <button class="menu-btn" data-difficulty="hard">Hard – small rings (current size)</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="replay-overlay" style="display: none;">
+        <div id="replay-panel">
+          <div id="replay-text">Time is up!</div>
+          <div id="replay-score">Score: 0</div>
+          <div id="replay-phase">Phase: -</div>
+          <div id="replay-duration">Total Time: 0:00</div>
+          <button id="replay-button">Play Again</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
