@@ -1,8 +1,5 @@
-import {
-	Controls,
-	Quaternion,
-	Vector3
-} from 'three';
+import { Quaternion, Vector3 } from "three";
+import { Controls } from "./Controls.js";
 
 /**
  * Fires when the camera has been transformed by the controls.
